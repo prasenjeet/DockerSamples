@@ -1,0 +1,12 @@
+{
+  "name": "sidecar-metrics-exporter",
+  "version": "1.0.0",
+  "description": "Sidecar container: scrapes main app metrics and exposes them on a dedicated port",
+  "main": "src/metrics-exporter.js",
+  "scripts": {
+    "start": "node src/metrics-exporter.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}

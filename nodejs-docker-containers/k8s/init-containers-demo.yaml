@@ -1,0 +1,156 @@
+# =============================================================================
+# Kubernetes — Init Containers Demo
+#
+# Init containers are declared under spec.initContainers[].
+# They run sequentially (in order) before any container in spec.containers[]
+# starts. Each init container must exit with code 0 before the next begins.
+#
+# This pod runs:
+#   1. init-config-generator  — writes config files to a shared emptyDir volume
+#   2. init-db-migrator       — waits for DB, runs migrations, seeds data
+#   3. main-app               — starts only after both init containers succeed
+# =============================================================================
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: notes-app-init-demo
+  namespace: default
+  labels:
+    app: notes-app
+    demo: init-containers
+  annotations:
+    description: "Demonstrates init containers running before the main app"
+spec:
+  # Shared in-memory volumes for init → main communication
+  volumes:
+    - name: app-config
+      emptyDir: {}        # Written by init-config-generator, read by main-app
+    - name: app-logs
+      emptyDir: {}        # Written by main-app, read by sidecar-log-shipper
+
+  # ── Init Containers (run sequentially, must exit 0 before main starts) ────
+  initContainers:
+
+    - name: init-config-generator
+      image: nodejs-docker-containers/init-config-generator:latest
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: CONFIG_DIR
+          value: /etc/app-config
+        - name: APP_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: notes-app-config
+              key: environment
+        - name: APP_VERSION
+          value: "1.0.0"
+        - name: FEATURE_FLAGS
+          value: "notes-delete,notes-tags"
+        - name: DB_HOST
+          value: postgres-service
+      volumeMounts:
+        - name: app-config
+          mountPath: /etc/app-config
+
+    - name: init-db-migrator
+      image: nodejs-docker-containers/init-db-migrator:latest
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: DB_HOST
+          value: postgres-service
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: notesdb
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        - name: MAX_RETRIES
+          value: "30"
+        - name: RETRY_INTERVAL_MS
+          value: "2000"
+
+  # ── Main Container (starts only after all initContainers exit 0) ──────────
+  containers:
+    - name: main-app
+      image: nodejs-docker-containers/main-app:latest
+      imagePullPolicy: IfNotPresent
+      ports:
+        - containerPort: 3000
+          name: http
+      env:
+        - name: PORT
+          value: "3000"
+        - name: DB_HOST
+          value: postgres-service
+        - name: DB_NAME
+          value: notesdb
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        - name: LOG_DIR
+          value: /var/log/app
+        - name: CONFIG_DIR
+          value: /etc/app-config
+      volumeMounts:
+        - name: app-config
+          mountPath: /etc/app-config
+          readOnly: true
+        - name: app-logs
+          mountPath: /var/log/app
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 5
+        periodSeconds: 10
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 3000
+        initialDelaySeconds: 15
+        periodSeconds: 20
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "500m"
+
+---
+# ConfigMap for environment-specific settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notes-app-config
+  namespace: default
+data:
+  environment: development
+
+---
+# Secret for database credentials (base64-encoded in real use)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: default
+type: Opaque
+stringData:
+  username: postgres
+  password: postgres
