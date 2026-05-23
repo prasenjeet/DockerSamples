@@ -1,0 +1,10 @@
+{
+  "name": "sidecar-log-shipper",
+  "version": "1.0.0",
+  "description": "Sidecar container: tails the main app log file and ships/formats logs",
+  "main": "src/log-shipper.js",
+  "scripts": {
+    "start": "node src/log-shipper.js"
+  },
+  "dependencies": {}
+}

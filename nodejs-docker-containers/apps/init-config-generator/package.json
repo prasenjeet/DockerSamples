@@ -1,0 +1,10 @@
+{
+  "name": "init-config-generator",
+  "version": "1.0.0",
+  "description": "Init container: generates runtime configuration files before the main app starts",
+  "main": "src/generate-config.js",
+  "scripts": {
+    "start": "node src/generate-config.js"
+  },
+  "dependencies": {}
+}

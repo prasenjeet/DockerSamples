@@ -1,0 +1,16 @@
+{
+  "name": "main-app",
+  "version": "1.0.0",
+  "description": "Main Node.js application demonstrating Docker container patterns",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.11.3",
+    "morgan": "^1.10.0",
+    "uuid": "^9.0.0"
+  }
+}
